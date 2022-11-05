@@ -8,6 +8,7 @@
     "build": "npm run build"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^8.5.9",
     "@types/node": "^18.11.2",
     "@types/pg": "^8.6.5",
     "@types/uuid": "^8.3.4",
@@ -16,6 +17,7 @@
   "dependencies": {
     "dotenv": "^16.0.3",
     "expo-server-sdk": "^3.7.0",
+    "jsonwebtoken": "^8.5.1",
     "pg": "^8.8.0",
     "socket.io": "^4.5.3",
     "uuid": "^9.0.0"

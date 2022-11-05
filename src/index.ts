@@ -1,13 +1,14 @@
 import dotenv from "dotenv";
 import { Server } from "socket.io";
 import { v4 as uuidv4 } from "uuid";
+import jwt from "jsonwebtoken";
 
 import {
   createMessages,
   getPushTokens,
   sendNotifications,
 } from "./notifications";
-import { SessionSocket } from "./types";
+import { SessionSocket, JWT } from "./types";
 
 dotenv.config();
 const io = new Server();
@@ -64,6 +65,7 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
+  console.log("New connection", (socket as SessionSocket).userID);
   socket.join((socket as SessionSocket).userSocketID);
 
   socket.emit("session", {
@@ -85,32 +87,46 @@ io.on("connection", (socket) => {
       text: string;
       senderName: string;
     }) => {
-      const receiver = sessionMap.get(receiverID);
+      const token = socket.handshake.auth.accessToken;
+      jwt.verify(
+        token,
+        process.env.ACCESS_TOKEN_SECRET as string,
+        async (
+          err: jwt.VerifyErrors | null,
+          decoded: string | jwt.JwtPayload | undefined
+        ) => {
+          if (err) return;
 
-      if (receiver && receiver.connected)
-        return (
-          socket
-            .to(receiver.userSocketID)
-            // .to((socket as SessionSocket).userSocketID)  // Add if you want messaging in multiple tabs to update at once
-            .emit("getMessage", {
-              senderID,
-              text,
-              senderName,
-              conversationID,
-            })
-        );
+          if (decoded && (decoded as JWT).ID === senderID) {
+            const receiver = sessionMap.get(receiverID);
 
-      const tokens = await getPushTokens(receiverID);
-      if (tokens) {
-        const messages = createMessages(
-          tokens,
-          text,
-          conversationID,
-          senderName
-        );
+            if (receiver && receiver.connected)
+              return (
+                socket
+                  .to(receiver.userSocketID)
+                  // .to((socket as SessionSocket).userSocketID)  // Add if you want messaging in multiple tabs to update at once
+                  .emit("getMessage", {
+                    senderID,
+                    text,
+                    senderName,
+                    conversationID,
+                  })
+              );
 
-        sendNotifications(messages);
-      }
+            const tokens = await getPushTokens(receiverID);
+            if (tokens) {
+              const messages = createMessages(
+                tokens,
+                text,
+                conversationID,
+                senderName
+              );
+
+              sendNotifications(messages);
+            }
+          }
+        }
+      );
     }
   );
 

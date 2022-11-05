@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
 const socket_io_1 = require("socket.io");
 const uuid_1 = require("uuid");
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const notifications_1 = require("./notifications");
 dotenv_1.default.config();
 const io = new socket_io_1.Server();
@@ -54,26 +55,34 @@ io.use((socket, next) => {
     next();
 });
 io.on("connection", (socket) => {
+    console.log("New connection", socket.userID);
     socket.join(socket.userSocketID);
     socket.emit("session", {
         sessionID: socket.sessionID,
     });
     socket.on("sendMessage", ({ senderID, receiverID, conversationID, text, senderName, }) => __awaiter(void 0, void 0, void 0, function* () {
-        const receiver = sessionMap.get(receiverID);
-        if (receiver && receiver.connected)
-            return (socket
-                .to(receiver.userSocketID)
-                .emit("getMessage", {
-                senderID,
-                text,
-                senderName,
-                conversationID,
-            }));
-        const tokens = yield (0, notifications_1.getPushTokens)(receiverID);
-        if (tokens) {
-            const messages = (0, notifications_1.createMessages)(tokens, text, conversationID, senderName);
-            (0, notifications_1.sendNotifications)(messages);
-        }
+        const token = socket.handshake.auth.accessToken;
+        jsonwebtoken_1.default.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => __awaiter(void 0, void 0, void 0, function* () {
+            if (err)
+                return;
+            if (decoded && decoded.ID === senderID) {
+                const receiver = sessionMap.get(receiverID);
+                if (receiver && receiver.connected)
+                    return (socket
+                        .to(receiver.userSocketID)
+                        .emit("getMessage", {
+                        senderID,
+                        text,
+                        senderName,
+                        conversationID,
+                    }));
+                const tokens = yield (0, notifications_1.getPushTokens)(receiverID);
+                if (tokens) {
+                    const messages = (0, notifications_1.createMessages)(tokens, text, conversationID, senderName);
+                    (0, notifications_1.sendNotifications)(messages);
+                }
+            }
+        }));
     }));
     socket.on("disconnect", () => {
         const userSession = sessionMap.get(socket.userID);

@@ -13,3 +13,9 @@ export type SessionSocket = Socket<
   username: string;
   connected: boolean;
 };
+
+export type JWT = {
+  ID: number;
+  iat: number;
+  exp: number;
+};
